@@ -4,6 +4,7 @@ import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import com.nostra13.universalimageloader.core.DisplayImageOptions;
 import com.nostra13.universalimageloader.core.ImageLoader;
@@ -14,7 +15,7 @@ import java.util.ArrayList;
 /**
  * Created by nurmemet on 2015/12/13.
  */
-public class BannerAdapter extends AdverTizeBanner.BannerAdapter{
+public class BannerAdapter extends AdverTizeBanner.BannerAdapter {
     private Context mCotext;
     private ArrayList<String> url;
     private ImageLoader imageLoader;
@@ -38,21 +39,23 @@ public class BannerAdapter extends AdverTizeBanner.BannerAdapter{
 
     @Override
     public int getCount() {
-        if (url!=null){
+        if (url != null) {
             return url.size();
         }
         return 0;
     }
 
     @Override
-    public View getView(int position, View mainView) {
+    public View getView(int position, View mainView, int chilIndex) {
 
-        if(mainView==null){
-            mainView= LayoutInflater.from(mCotext).inflate(R.layout.banner_item,null);
+        if (mainView == null) {
+            mainView = LayoutInflater.from(mCotext).inflate(R.layout.banner_item, null);
         }
 
 
-        ImageView img=(ImageView)mainView.findViewById(R.id.test);
+        ImageView img = (ImageView) mainView.findViewById(R.id.test);
+        TextView tv = (TextView) mainView.findViewById(R.id.index);
+        tv.setText(""+chilIndex);
 //        AQuery aq = new AQuery(mainView);
 //
 //        aq.id(R.id.test).image(url.get(position),true,true);

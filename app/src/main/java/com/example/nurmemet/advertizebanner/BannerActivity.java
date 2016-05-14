@@ -32,7 +32,7 @@ public class BannerActivity extends Activity {
         initDatas();
         mAdapter = new BannerAdapter(this, imageUrlList);
         banner.setAdapter(mAdapter);
-        banner.statrtAutoPlay();
+        banner.start();
 
     }
 
@@ -45,11 +45,9 @@ public class BannerActivity extends Activity {
                 .add("http://d.hiphotos.baidu.com/image/pic/item/adaf2edda3cc7cd976427f6c3901213fb80e911c.jpg");
         imageUrlList
                 .add("http://g.hiphotos.baidu.com/image/pic/item/b3119313b07eca80131de3e6932397dda1448393.jpg");
-//        imageUrlList.add("http://www.oschina.net/uploads/img/201207/16151042_50i0.jpg");
-//        imageUrlList.add("http://img2.3lian.com/2014/f5/158/d/86.jpg");
-//        imageUrlList.add("http://images.99pet.com/InfoImages/wm600_450/1d770941f8d44c6e85ba4c0eb736ef69.jpg");
-//        imageUrlList.add("http://img2.3lian.com/2014/f5/158/d/87.jpg");
-//        imageUrlList.add("http://images.99pet.com/InfoImages/wm600_450/ef48d0d8e8f64172a28b9451fc5a941d.jpg");
+
+
+
 
 
 

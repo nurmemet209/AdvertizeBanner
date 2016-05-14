@@ -33,11 +33,7 @@ public class AdverTizeBanner extends ViewGroup {
 
 
     private ArrayList<View> viewList = new ArrayList<View>();
-    private OnSelectedChanged onSelectedChanged;
 
-    public void SetOnSelectedChanged(OnSelectedChanged onSelectedChanged) {
-        this.onSelectedChanged = onSelectedChanged;
-    }
 
     public AdverTizeBanner(Context context) {
         super(context);
@@ -149,9 +145,6 @@ public class AdverTizeBanner extends ViewGroup {
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         dispatchLayout();
-//        if (isSwitch2First) {
-//            isSwitch2First = false;
-//        }
     }
 
     private void dispatchLayout() {
@@ -261,16 +254,7 @@ public class AdverTizeBanner extends ViewGroup {
 
     }
 
-    public static interface OnSelectedChanged {
-        public void OnSelectedChanged(int oldPosition, int newPosition);
-    }
-
-
-    private int x = 0;
-
     public void start() {
-
-
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
@@ -284,9 +268,7 @@ public class AdverTizeBanner extends ViewGroup {
                     @Override
                     public void onAnimationUpdate(ValueAnimator animation) {
                         int value = (Integer) animation.getAnimatedValue();
-                        x = value;
-                        scrollTo(x, getScrollY());
-                        //invalidate();
+                        scrollTo(value, getScrollY());
                     }
                 });
                 animator.addListener(new Animator.AnimatorListener() {
@@ -307,14 +289,7 @@ public class AdverTizeBanner extends ViewGroup {
                             mCurrentScreen = 0;
                             mAdapter.getView(mAdapterPosition, viewList.get(mCurrentScreen), mCurrentScreen);
                             scrollTo(0, getScrollY());
-                            //  invalidate();
-                            // invalidate();
-
-                        } else {
-
                         }
-
-
                         start();
                     }
 
@@ -335,5 +310,8 @@ public class AdverTizeBanner extends ViewGroup {
 
     }
 
-
+    @Override
+    public LayoutParams generateLayoutParams(AttributeSet attrs) {
+        return new MarginLayoutParams(getContext(), attrs);
+    }
 }

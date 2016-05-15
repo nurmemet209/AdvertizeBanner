@@ -7,19 +7,13 @@ import android.graphics.Rect;
 import android.os.Handler;
 import android.support.v4.view.MotionEventCompat;
 import android.support.v4.view.VelocityTrackerCompat;
-import android.support.v4.view.ViewCompat;
-import android.support.v4.view.ViewPager;
-import android.support.v4.widget.EdgeEffectCompat;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewParent;
-import android.view.animation.AccelerateDecelerateInterpolator;
-import android.view.animation.AnticipateOvershootInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.Interpolator;
 
@@ -33,7 +27,6 @@ public class AdverTizeBanner extends ViewGroup {
     private Interpolator animInterpolator = new DecelerateInterpolator();
     private static final int MIN_DISTANCE_FOR_FLING = 25; // dips
     private static final int MIN_FLING_VELOCITY = 400; // dips
-
     private int mFlingDistance;
     private int mMinimumVelocity;
     private static final String TAG = "ViewPager";
@@ -42,44 +35,24 @@ public class AdverTizeBanner extends ViewGroup {
     private BannerAdapter mAdapter;
     int mTouchSlop;
     int mMaximumVelocity;
-    /**
-     * Determines speed during touch scrolling
-     */
     private VelocityTracker mVelocityTracker;
-
-    /**
-     * Position of the last motion event.
-     */
     private float mLastMotionX;
     private float mLastMotionY;
     private float mInitialMotionX;
     private float mInitialMotionY;
     private boolean mIsBeingDragged;
-    private boolean mIsUnableToDrag;
-    private EdgeEffectCompat mLeftEdge;
-    private EdgeEffectCompat mRightEdge;
-    /**
-     * ID of the active pointer. This is used to retain consistency during
-     * drags/flings if multiple pointers are used.
-     */
     private int mActivePointerId = INVALID_POINTER;
-    /**
-     * Sentinel value for no current active pointer.
-     * Used by {@link #mActivePointerId}.
-     */
     private static final int INVALID_POINTER = -1;
     private int mDuration = 2000;
     private Handler handler;
     private int mCurrentScreen;
     private int mAdapterPosition = 0;
-
     //布局孩子节点的空间的大小
     private Rect availableSpace = new Rect();
-
-
     private ArrayList<View> viewList = new ArrayList<View>();
-
-    ValueAnimator animator;
+    ValueAnimator autoScrollAnim;
+    ValueAnimator adjustPostionAnim;
+    private static float OVER_PAGE_FLAG = 0.75f;
 
 
     public AdverTizeBanner(Context context) {
@@ -136,44 +109,33 @@ public class AdverTizeBanner extends ViewGroup {
 
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
-//        if (mFakeDragging) {
-//            // A fake drag is in progress already, ignore this real one
-//            // but still eat the touch events.
-//            // (It is likely that the user is multi-touching the screen.)
-//            return true;
-//        }
-
         if (ev.getAction() == MotionEvent.ACTION_DOWN && ev.getEdgeFlags() != 0) {
             // Don't handle edge touches immediately -- they may actually belong to one of our
             // descendants.
             return false;
         }
-
         if (mAdapter == null || mAdapter.getCount() == 0) {
             // Nothing to present or scroll; nothing to touch.
             return false;
         }
-
         if (mVelocityTracker == null) {
             mVelocityTracker = VelocityTracker.obtain();
+        }
+        if (adjustPostionAnim != null && adjustPostionAnim.isRunning()) {
+            return false;
         }
         mVelocityTracker.addMovement(ev);
 
         final int action = ev.getAction();
-        boolean needsInvalidate = false;
 
         switch (action & MotionEventCompat.ACTION_MASK) {
             case MotionEvent.ACTION_DOWN: {
-//                mScroller.abortAnimation();
-//                mPopulatePending = false;
-//                populate();
 
-                // Remember where the motion event started
                 mLastMotionX = mInitialMotionX = ev.getX();
                 mLastMotionY = mInitialMotionY = ev.getY();
                 mActivePointerId = MotionEventCompat.getPointerId(ev, 0);
-                if (animator != null && animator.isRunning()) {
-                    animator.cancel();
+                if (autoScrollAnim != null && autoScrollAnim.isRunning()) {
+                    autoScrollAnim.cancel();
 
                 }
                 resetPosition(ev.getX());
@@ -181,11 +143,11 @@ public class AdverTizeBanner extends ViewGroup {
                 break;
             }
             case MotionEvent.ACTION_MOVE:
+
                 if (!mIsBeingDragged) {
                     final int pointerIndex = MotionEventCompat.findPointerIndex(ev, mActivePointerId);
                     if (pointerIndex == -1) {
-                        // A child has consumed some touch events and put us into an inconsistent state.
-                        needsInvalidate = resetTouch();
+                        resetTouch();
                         break;
                     }
                     final float x = MotionEventCompat.getX(ev, pointerIndex);
@@ -193,15 +155,11 @@ public class AdverTizeBanner extends ViewGroup {
                     final float y = MotionEventCompat.getY(ev, pointerIndex);
                     final float yDiff = Math.abs(y - mLastMotionY);
                     if (xDiff > mTouchSlop && xDiff > yDiff) {
-                        if (DEBUG) Log.v(TAG, "Starting drag!");
                         mIsBeingDragged = true;
                         requestParentDisallowInterceptTouchEvent(true);
                         mLastMotionX = x - mInitialMotionX > 0 ? mInitialMotionX + mTouchSlop :
                                 mInitialMotionX - mTouchSlop;
                         mLastMotionY = y;
-//                        setScrollState(SCROLL_STATE_DRAGGING);
-//                        setScrollingCacheEnabled(true);
-
                         // Disallow Parent Intercept, just in case
                         ViewParent parent = getParent();
                         if (parent != null) {
@@ -209,13 +167,11 @@ public class AdverTizeBanner extends ViewGroup {
                         }
                     }
                 }
-                // Not else! Note that mIsBeingDragged can be set above.
                 if (mIsBeingDragged) {
-                    // Scroll to follow the motion event
                     final int activePointerIndex = MotionEventCompat.findPointerIndex(
                             ev, mActivePointerId);
                     final float x = MotionEventCompat.getX(ev, activePointerIndex);
-                    needsInvalidate |= performDrag(x);
+                    performDrag(x);
 
                 }
 
@@ -227,21 +183,14 @@ public class AdverTizeBanner extends ViewGroup {
                     velocityTracker.computeCurrentVelocity(1000, mMaximumVelocity);
                     int initialVelocity = (int) VelocityTrackerCompat.getXVelocity(
                             velocityTracker, mActivePointerId);
-//                    mPopulatePending = true;
-//                    final int width = getClientWidth();
-//                    final int scrollX = getScrollX();
-//                    final ItemInfo ii = infoForCurrentScrollPosition();
-//                    final int currentPage = ii.position;
-//                    final float pageOffset = (((float) scrollX / width) - ii.offset) / ii.widthFactor;
                     final int activePointerIndex =
                             MotionEventCompat.findPointerIndex(ev, mActivePointerId);
                     final float x = MotionEventCompat.getX(ev, activePointerIndex);
                     final int totalDelta = (int) (x - mInitialMotionX);
-                    int nextPage = determineTargetPage(mCurrentScreen, 0, initialVelocity,
+                    int nextPage = determineTargetPage(mCurrentScreen, initialVelocity,
                             totalDelta);
-                    setCurrentItemInternal(nextPage, true, true, initialVelocity);
-
-                    needsInvalidate = resetTouch();
+                    setCurrentItemInternal(nextPage, true, initialVelocity);
+                    resetTouch();
                 }
                 break;
             case MotionEvent.ACTION_CANCEL:
@@ -322,6 +271,7 @@ public class AdverTizeBanner extends ViewGroup {
 
     private void resetPosition(float x) {
         float scrollX = getScrollX();
+        //如果当前屏幕是最后一个屏幕，为了防止手动拖动时拖出屏幕外把当前屏幕移到中间
         if (scrollX + getWidth() + x > viewNum * getWidth()) {
             //最后两个视图移到最前面，第一个移到最后面
             View v0 = viewList.remove(0);
@@ -330,15 +280,17 @@ public class AdverTizeBanner extends ViewGroup {
             requestLayout();
             mCurrentScreen = 1;
             setData(true);
+            //如果当前屏幕是第一个屏幕，为了防止手动拖动时拖出屏幕外把当前屏幕移到中间，即mCurrentScreen 1
         } else if (scrollX - (getWidth() - x) < 0) {
             mCurrentScreen = 1;
+            //第三个视图加载第二个位置的内容，因为第二个视图即将换到第一个位置并且当且屏幕是第二个视图
             mAdapter.getView(mAdapterPosition, viewList.get(mCurrentScreen + 1), -1);
             //把第一个视图移到第二个位置
             View v0 = viewList.remove(0);
             viewList.add(1, v0);
             scrollBy(getWidth(), 0);
             requestLayout();
-
+            //第一个视图加载数据
             setData(false);
         }
     }
@@ -348,81 +300,69 @@ public class AdverTizeBanner extends ViewGroup {
      */
     private void setData(boolean isNext) {
         if (isNext) {
-            if (mAdapterPosition + 1 < mAdapter.getCount()) {
-                mAdapter.getView(mAdapterPosition + 1, viewList.get(mCurrentScreen + 1), -1);
-            } else {
-                mAdapter.getView(0, viewList.get(mCurrentScreen + 1), -1);
-            }
+            mAdapter.getView(mAdapterPosition + 1 < mAdapter.getCount() ? mAdapterPosition + 1 : 0, viewList.get(mCurrentScreen + 1), -1);
+//            if (mAdapterPosition + 1 < mAdapter.getCount()) {
+//                mAdapter.getView(mAdapterPosition + 1, viewList.get(mCurrentScreen + 1), -1);
+//            } else {
+//                mAdapter.getView(0, viewList.get(mCurrentScreen + 1), -1);
+//            }
         } else {
-            if (mAdapterPosition - 1 > 0) {
-                mAdapter.getView(mAdapterPosition - 1, viewList.get(mCurrentScreen - 1), -1);
-            } else {
-                mAdapter.getView(mAdapter.getCount() - 1, viewList.get(mCurrentScreen - 1), -1);
-            }
+            mAdapter.getView(mAdapterPosition - 1 > 0 ? mAdapterPosition - 1 : mAdapter.getCount() - 1, viewList.get(mCurrentScreen - 1), -1);
+//            if (mAdapterPosition - 1 > 0) {
+//                mAdapter.getView(mAdapterPosition - 1, viewList.get(mCurrentScreen - 1), -1);
+//            } else {
+//                mAdapter.getView(mAdapter.getCount() - 1, viewList.get(mCurrentScreen - 1), -1);
+//            }
         }
     }
 
-    private void sw(int p1, int p2) {
-//        viewList.clear();
-//        viewList.add(getChildAt(0));
-//        viewList.add(getChildAt(2));
-//        viewList.add(getChildAt(1));
-//        if (viewList != null && Math.max(p1, p2) < viewList.size()) {
-//
-//            View v2 = viewList.remove(p2);
-//            View v1 = viewList.remove(p1);
-//            viewList.add(p1, v2);
-//            viewList.add(p2, v1);
-//        }
-
-
-    }
 
     /**
      * @param nextPage
      * @param b
-     * @param b1
      * @param initialVelocity 用来计算剩余的时间以便松开时的动画效果更自然
      */
-    private void setCurrentItemInternal(int nextPage, boolean b, boolean b1, int initialVelocity) {
+    private void setCurrentItemInternal(int nextPage, boolean b, final int initialVelocity) {
 
-        int x = nextPage * getWidth();
+        final int x = nextPage * getWidth();
         int y = getScrollY();
         double duration = Math.abs(mCurrentScreen * getWidth() - getScrollX()) * ANIM_DURATION / getWidth();
-        ValueAnimator anim = ValueAnimator.ofInt(getScrollX(), x);
-        anim.setDuration((int) duration);
-        anim.setInterpolator(animInterpolator);
-        anim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+        adjustPostionAnim = ValueAnimator.ofInt(getScrollX(), x);
+        adjustPostionAnim.setDuration((int) duration);
+        adjustPostionAnim.setInterpolator(animInterpolator);
+        adjustPostionAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
             @Override
             public void onAnimationUpdate(ValueAnimator animation) {
                 int value = (int) animation.getAnimatedValue();
                 scrollTo(value, getScrollY());
             }
         });
-        anim.addListener(new Animator.AnimatorListener() {
+        adjustPostionAnim.addListener(new Animator.AnimatorListener() {
             @Override
             public void onAnimationStart(Animator animation) {
+                int position = (Integer) viewList.get(1).getTag();
+
+                if (initialVelocity < 0) {
+                    if (position + 1 < mAdapter.getCount()) {
+                        mAdapterPosition = position + 1;
+                    } else {
+                        mAdapterPosition = 0;
+                    }
+                } else {
+                    if (position == 0) {
+                        mAdapterPosition = mAdapter.getCount() - 1;
+                    } else {
+                        mAdapterPosition = position - 1;
+                    }
+                }
+
 
             }
 
             @Override
             public void onAnimationEnd(Animator animation) {
                 int cur = (int) (getScrollX() / getWidth() + 0.5F);
-                if (cur > mCurrentScreen) {
-                    if (mAdapterPosition + 1 < mAdapter.getCount()) {
-                        mAdapterPosition++;
-                    } else {
-                        mAdapterPosition = 0;
-                    }
-                } else {
-                    if (mAdapterPosition == 0) {
-                        mAdapterPosition = mAdapter.getCount() - 1;
-                    } else {
-                        mAdapterPosition--;
-                    }
-                }
                 mCurrentScreen = cur;
-                ;
                 if (mCurrentScreen == 2 || mCurrentScreen == 0) {
                     mCurrentScreen = 1;
                     mAdapter.getView(mAdapterPosition, viewList.get(mCurrentScreen), mCurrentScreen);
@@ -442,18 +382,22 @@ public class AdverTizeBanner extends ViewGroup {
 
             }
         });
-        anim.start();
+        adjustPostionAnim.start();
 
 
     }
 
-    private int determineTargetPage(int currentPage, float pageOffset, int velocity, int deltaX) {
+    private int determineTargetPage(int currentPage, int velocity, int deltaX) {
         int targetPage = currentPage;
         if (Math.abs(deltaX) > mFlingDistance && Math.abs(velocity) > mMinimumVelocity) {
+            //targetPage=deltaX>0?currentPage-1:currentPage+1;
             if (deltaX > 0) {
                 targetPage = currentPage - 1;
             } else {
-                targetPage = currentPage + 1;
+                if (getScrollX() > getWidth() * OVER_PAGE_FLAG) {
+                    targetPage = currentPage + 1;
+                }
+
             }
         } else {
             targetPage = currentPage;
@@ -462,64 +406,18 @@ public class AdverTizeBanner extends ViewGroup {
     }
 
     private boolean performDrag(float x) {
-
-
-        boolean needsInvalidate = false;
-
         final float deltaX = mLastMotionX - x;
         mLastMotionX = x;
-
         float oldScrollX = getScrollX();
         float scrollX = oldScrollX + deltaX;
-//        final int width = getClientWidth();
-//
-//        float leftBound = width * mFirstOffset;
-//        float rightBound = width * mLastOffset;
-//        boolean leftAbsolute = true;
-//        boolean rightAbsolute = true;
-//
-//        final ItemInfo firstItem = mItems.get(0);
-//        final ItemInfo lastItem = mItems.get(mItems.size() - 1);
-//        if (firstItem.position != 0) {
-//            leftAbsolute = false;
-//            leftBound = firstItem.offset * width;
-//        }
-//        if (lastItem.position != mAdapter.getCount() - 1) {
-//            rightAbsolute = false;
-//            rightBound = lastItem.offset * width;
-//        }
-//
-//        if (scrollX < leftBound) {
-//            if (leftAbsolute) {
-//                float over = leftBound - scrollX;
-//                needsInvalidate = mLeftEdge.onPull(Math.abs(over) / width);
-//            }
-//            scrollX = leftBound;
-//        } else if (scrollX > rightBound) {
-//            if (rightAbsolute) {
-//                float over = scrollX - rightBound;
-//                needsInvalidate = mRightEdge.onPull(Math.abs(over) / width);
-//            }
-//            scrollX = rightBound;
-//        }
-        // Don't lose the rounded component
         mLastMotionX += scrollX - (int) scrollX;
         scrollTo((int) scrollX, getScrollY());
-        // pageScrolled((int) scrollX);
-
         return true;
     }
 
-    private boolean pageScrolled(int xpos) {
-
-        return true;
-    }
 
     private boolean resetTouch() {
-//        boolean needsInvalidate;
-//        mActivePointerId = INVALID_POINTER;
-//        endDrag();
-//        needsInvalidate = mLeftEdge.onRelease() | mRightEdge.onRelease();
+        mActivePointerId = INVALID_POINTER;
         return true;
     }
 
@@ -527,16 +425,6 @@ public class AdverTizeBanner extends ViewGroup {
         final ViewParent parent = getParent();
         if (parent != null) {
             parent.requestDisallowInterceptTouchEvent(disallowIntercept);
-        }
-    }
-
-    private void endDrag() {
-        mIsBeingDragged = false;
-        mIsUnableToDrag = false;
-
-        if (mVelocityTracker != null) {
-            mVelocityTracker.recycle();
-            mVelocityTracker = null;
         }
     }
 
@@ -662,17 +550,17 @@ public class AdverTizeBanner extends ViewGroup {
                 int fromX = mCurrentScreen * getWidth();
                 int toX = (mCurrentScreen + 1) * getWidth();
 
-                animator = ValueAnimator.ofInt(fromX, toX);
-                animator.setDuration(3000);
-                animator.setInterpolator(animInterpolator);
-                animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                autoScrollAnim = ValueAnimator.ofInt(fromX, toX);
+                autoScrollAnim.setDuration(3000);
+                autoScrollAnim.setInterpolator(animInterpolator);
+                autoScrollAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
                     @Override
                     public void onAnimationUpdate(ValueAnimator animation) {
                         int value = (Integer) animation.getAnimatedValue();
                         scrollTo(value, getScrollY());
                     }
                 });
-                animator.addListener(new Animator.AnimatorListener() {
+                autoScrollAnim.addListener(new Animator.AnimatorListener() {
                     @Override
                     public void onAnimationStart(Animator animation) {
                         mAdapterPosition++;
@@ -714,7 +602,7 @@ public class AdverTizeBanner extends ViewGroup {
 
                     }
                 });
-                animator.start();
+                autoScrollAnim.start();
 
 
             }

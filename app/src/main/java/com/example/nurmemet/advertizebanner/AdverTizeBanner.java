@@ -23,7 +23,7 @@ import java.util.ArrayList;
  * Created by nurmemet on 2015/12/12.
  */
 public class AdverTizeBanner extends ViewGroup {
-    private int ANIM_DURATION = 3000;
+    private int ANIM_DURATION = 700;
     private Interpolator animInterpolator = new DecelerateInterpolator();
     private static final int MIN_DISTANCE_FOR_FLING = 25; // dips
     private static final int MIN_FLING_VELOCITY = 400; // dips
@@ -43,7 +43,7 @@ public class AdverTizeBanner extends ViewGroup {
     private boolean mIsBeingDragged;
     private int mActivePointerId = INVALID_POINTER;
     private static final int INVALID_POINTER = -1;
-    private int mDuration = 2000;
+    private int mDuration = 700;
     private Handler handler;
     private int mCurrentScreen;
     private int mAdapterPosition = 0;
@@ -52,7 +52,7 @@ public class AdverTizeBanner extends ViewGroup {
     private ArrayList<View> viewList = new ArrayList<View>();
     ValueAnimator autoScrollAnim;
     ValueAnimator adjustPostionAnim;
-    private static float OVER_PAGE_FLAG = 0.75f;
+    private static float OVER_PAGE_FLAG = 0.9f;
 
 
     public AdverTizeBanner(Context context) {
@@ -103,7 +103,7 @@ public class AdverTizeBanner extends ViewGroup {
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
         boolean b = super.dispatchTouchEvent(ev);
-        System.out.println("dispatch");
+        //System.out.println("dispatch");
         return b;
     }
 
@@ -178,7 +178,7 @@ public class AdverTizeBanner extends ViewGroup {
 
                 break;
             case MotionEvent.ACTION_UP:
-                if (mIsBeingDragged) {
+                if (true) {
                     final VelocityTracker velocityTracker = mVelocityTracker;
                     velocityTracker.computeCurrentVelocity(1000, mMaximumVelocity);
                     int initialVelocity = (int) VelocityTrackerCompat.getXVelocity(
@@ -191,13 +191,18 @@ public class AdverTizeBanner extends ViewGroup {
                             totalDelta);
                     setCurrentItemInternal(nextPage, true, initialVelocity);
                     resetTouch();
+
                 }
                 break;
             case MotionEvent.ACTION_CANCEL:
-//                if (mIsBeingDragged) {
-//                   // scrollToItem(mCurItem, true, 0, false);
-//                    needsInvalidate = resetTouch();
-//                }
+                System.out.println("canceled");
+                if (mIsBeingDragged) {
+                    int nextPage = determineTargetPage(mCurrentScreen, 0,
+                            0);
+                    setCurrentItemInternal(nextPage, true, 0);
+                    resetTouch();
+
+                }
                 break;
 //            case MotionEventCompat.ACTION_POINTER_DOWN: {
 //                final int index = MotionEventCompat.getActionIndex(ev);
@@ -301,18 +306,8 @@ public class AdverTizeBanner extends ViewGroup {
     private void setData(boolean isNext) {
         if (isNext) {
             mAdapter.getView(mAdapterPosition + 1 < mAdapter.getCount() ? mAdapterPosition + 1 : 0, viewList.get(mCurrentScreen + 1), -1);
-//            if (mAdapterPosition + 1 < mAdapter.getCount()) {
-//                mAdapter.getView(mAdapterPosition + 1, viewList.get(mCurrentScreen + 1), -1);
-//            } else {
-//                mAdapter.getView(0, viewList.get(mCurrentScreen + 1), -1);
-//            }
         } else {
             mAdapter.getView(mAdapterPosition - 1 > 0 ? mAdapterPosition - 1 : mAdapter.getCount() - 1, viewList.get(mCurrentScreen - 1), -1);
-//            if (mAdapterPosition - 1 > 0) {
-//                mAdapter.getView(mAdapterPosition - 1, viewList.get(mCurrentScreen - 1), -1);
-//            } else {
-//                mAdapter.getView(mAdapter.getCount() - 1, viewList.get(mCurrentScreen - 1), -1);
-//            }
         }
     }
 
@@ -325,8 +320,8 @@ public class AdverTizeBanner extends ViewGroup {
     private void setCurrentItemInternal(int nextPage, boolean b, final int initialVelocity) {
 
         final int x = nextPage * getWidth();
-        int y = getScrollY();
-        double duration = Math.abs(mCurrentScreen * getWidth() - getScrollX()) * ANIM_DURATION / getWidth();
+        double p = getScrollX() / getWidth();
+        double duration = (1 - (p - (int) p)) * ANIM_DURATION;
         adjustPostionAnim = ValueAnimator.ofInt(getScrollX(), x);
         adjustPostionAnim.setDuration((int) duration);
         adjustPostionAnim.setInterpolator(animInterpolator);
@@ -370,7 +365,10 @@ public class AdverTizeBanner extends ViewGroup {
                     mAdapter.getView(mAdapterPosition == mAdapter.getCount() - 1 ? 0 : mAdapterPosition + 1, viewList.get(mCurrentScreen + 1), mCurrentScreen + 1);
                     scrollTo(getWidth(), getScrollY());
                 }
+                isCanceled = false;
+                start();
             }
+
 
             @Override
             public void onAnimationCancel(Animator animation) {
@@ -390,7 +388,6 @@ public class AdverTizeBanner extends ViewGroup {
     private int determineTargetPage(int currentPage, int velocity, int deltaX) {
         int targetPage = currentPage;
         if (Math.abs(deltaX) > mFlingDistance && Math.abs(velocity) > mMinimumVelocity) {
-            //targetPage=deltaX>0?currentPage-1:currentPage+1;
             if (deltaX > 0) {
                 targetPage = currentPage - 1;
             } else {
@@ -408,6 +405,7 @@ public class AdverTizeBanner extends ViewGroup {
     private boolean performDrag(float x) {
         final float deltaX = mLastMotionX - x;
         mLastMotionX = x;
+
         float oldScrollX = getScrollX();
         float scrollX = oldScrollX + deltaX;
         mLastMotionX += scrollX - (int) scrollX;
@@ -418,6 +416,7 @@ public class AdverTizeBanner extends ViewGroup {
 
     private boolean resetTouch() {
         mActivePointerId = INVALID_POINTER;
+        mIsBeingDragged = false;
         return true;
     }
 
@@ -551,7 +550,7 @@ public class AdverTizeBanner extends ViewGroup {
                 int toX = (mCurrentScreen + 1) * getWidth();
 
                 autoScrollAnim = ValueAnimator.ofInt(fromX, toX);
-                autoScrollAnim.setDuration(3000);
+                autoScrollAnim.setDuration(ANIM_DURATION);
                 autoScrollAnim.setInterpolator(animInterpolator);
                 autoScrollAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
                     @Override

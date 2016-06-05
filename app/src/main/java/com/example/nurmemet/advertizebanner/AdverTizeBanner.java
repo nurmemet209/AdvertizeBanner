@@ -8,6 +8,7 @@ import android.os.Handler;
 import android.support.v4.view.MotionEventCompat;
 import android.support.v4.view.VelocityTrackerCompat;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
@@ -46,10 +47,11 @@ public class AdverTizeBanner extends ViewGroup {
     private int mDuration = 700;
     private Handler handler;
     private int mCurrentScreen;
-    private int mAdapterPosition = 0;
+    private int mNextScreen;
+    //private int mAdapterPosition = 0;
     //布局孩子节点的空间的大小
     private Rect availableSpace = new Rect();
-    private ArrayList<View> viewList = new ArrayList<View>();
+    private ArrayList<ViewHolder> viewList = new ArrayList<ViewHolder>();
     ValueAnimator autoScrollAnim;
     ValueAnimator adjustPostionAnim;
     private static float OVER_PAGE_FLAG = 0.9f;
@@ -96,6 +98,15 @@ public class AdverTizeBanner extends ViewGroup {
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
 
+        final int action = ev.getAction() & MotionEventCompat.ACTION_MASK;
+
+        // Always take care of the touch gesture being complete.
+        if (action == MotionEvent.ACTION_CANCEL || action == MotionEvent.ACTION_UP) {
+            // Release the drag.
+            if (DEBUG) Log.v(TAG, "Intercept done!");
+            resetTouch();
+            return false;
+        }
 
         return true;
     }
@@ -109,7 +120,9 @@ public class AdverTizeBanner extends ViewGroup {
 
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
-        if (ev.getAction() == MotionEvent.ACTION_DOWN && ev.getEdgeFlags() != 0) {
+
+        int action = MotionEventCompat.getActionMasked(ev);
+        if (action == MotionEvent.ACTION_DOWN && ev.getEdgeFlags() != 0) {
             // Don't handle edge touches immediately -- they may actually belong to one of our
             // descendants.
             return false;
@@ -126,11 +139,9 @@ public class AdverTizeBanner extends ViewGroup {
         }
         mVelocityTracker.addMovement(ev);
 
-        final int action = ev.getAction();
 
-        switch (action & MotionEventCompat.ACTION_MASK) {
+        switch (action) {
             case MotionEvent.ACTION_DOWN: {
-
                 mLastMotionX = mInitialMotionX = ev.getX();
                 mLastMotionY = mInitialMotionY = ev.getY();
                 mActivePointerId = MotionEventCompat.getPointerId(ev, 0);
@@ -143,7 +154,6 @@ public class AdverTizeBanner extends ViewGroup {
                 break;
             }
             case MotionEvent.ACTION_MOVE:
-
                 if (!mIsBeingDragged) {
                     final int pointerIndex = MotionEventCompat.findPointerIndex(ev, mActivePointerId);
                     if (pointerIndex == -1) {
@@ -156,15 +166,12 @@ public class AdverTizeBanner extends ViewGroup {
                     final float yDiff = Math.abs(y - mLastMotionY);
                     if (xDiff > mTouchSlop && xDiff > yDiff) {
                         mIsBeingDragged = true;
-                        requestParentDisallowInterceptTouchEvent(true);
+
                         mLastMotionX = x - mInitialMotionX > 0 ? mInitialMotionX + mTouchSlop :
                                 mInitialMotionX - mTouchSlop;
                         mLastMotionY = y;
                         // Disallow Parent Intercept, just in case
-                        ViewParent parent = getParent();
-                        if (parent != null) {
-                            parent.requestDisallowInterceptTouchEvent(true);
-                        }
+                        requestParentDisallowInterceptTouchEvent(true);
                     }
                 }
                 if (mIsBeingDragged) {
@@ -277,39 +284,52 @@ public class AdverTizeBanner extends ViewGroup {
     private void resetPosition(float x) {
         float scrollX = getScrollX();
         //如果当前屏幕是最后一个屏幕，为了防止手动拖动时拖出屏幕外把当前屏幕移到中间
-        if (scrollX + getWidth() + x > viewNum * getWidth()) {
+        if (scrollX + getMeasuredWidth() + x > viewNum * getMeasuredWidth()) {
             //最后两个视图移到最前面，第一个移到最后面
-            View v0 = viewList.remove(0);
-            viewList.add(v0);
+            ViewHolder view0 = viewList.remove(0);
+            view0.adapterPosition = getNextAdapterPosition();
+            viewList.add(view0);
             scrollBy(-getWidth(), 0);
             requestLayout();
+            mAdapter.getView(viewList.get(2).adapterPosition, viewList.get(2).view, 2);
             mCurrentScreen = 1;
-            setData(true);
+            //setData(true);
+            //
+            //
+            //
+            // mAdapter.getView(viewList.get(1).adapterPosition, viewList.get(1).view, 1);
             //如果当前屏幕是第一个屏幕，为了防止手动拖动时拖出屏幕外把当前屏幕移到中间，即mCurrentScreen 1
-        } else if (scrollX - (getWidth() - x) < 0) {
+        } else if (scrollX - (getMeasuredWidth() - x) < 0) {
             mCurrentScreen = 1;
             //第三个视图加载第二个位置的内容，因为第二个视图即将换到第一个位置并且当且屏幕是第二个视图
-            mAdapter.getView(mAdapterPosition, viewList.get(mCurrentScreen + 1), -1);
+            //mAdapter.getView(mAdapterPosition, viewList.get(mCurrentScreen + 1).view, -1);
             //把第一个视图移到第二个位置
-            View v0 = viewList.remove(0);
-            viewList.add(1, v0);
+            ViewHolder view2 = viewList.remove(2);
+            view2.adapterPosition = getPreviousAdapterPosition();
+            viewList.add(0, view2);
             scrollBy(getWidth(), 0);
             requestLayout();
             //第一个视图加载数据
-            setData(false);
+            mAdapter.getView(viewList.get(0).adapterPosition, viewList.get(0).view, 0);
+            //setData(false);
+        } else {
+
         }
+
+
+        System.out.println("current_page   vvvvvvvvvvvvvvvvvv"+mCurrentScreen);
     }
 
     /**
      * @param isNext 加载后一个视图的数据还是前一个视图的数据
      */
-    private void setData(boolean isNext) {
-        if (isNext) {
-            mAdapter.getView(mAdapterPosition + 1 < mAdapter.getCount() ? mAdapterPosition + 1 : 0, viewList.get(mCurrentScreen + 1), -1);
-        } else {
-            mAdapter.getView(mAdapterPosition - 1 > 0 ? mAdapterPosition - 1 : mAdapter.getCount() - 1, viewList.get(mCurrentScreen - 1), -1);
-        }
-    }
+//    private void setData(boolean isNext) {
+//        if (isNext) {
+//            mAdapter.getView(mAdapterPosition + 1 < mAdapter.getCount() ? mAdapterPosition + 1 : 0, viewList.get(mCurrentScreen + 1).view, -1);
+//        } else {
+//            mAdapter.getView(mAdapterPosition - 1 > 0 ? mAdapterPosition - 1 : mAdapter.getCount() - 1, viewList.get(mCurrentScreen - 1).view, -1);
+//        }
+//    }
 
 
     /**
@@ -318,7 +338,7 @@ public class AdverTizeBanner extends ViewGroup {
      * @param initialVelocity 用来计算剩余的时间以便松开时的动画效果更自然
      */
     private void setCurrentItemInternal(int nextPage, boolean b, final int initialVelocity) {
-
+        mNextScreen = nextPage;
         final int x = nextPage * getWidth();
         double p = getScrollX() / getWidth();
         double duration = (1 - (p - (int) p)) * ANIM_DURATION;
@@ -335,35 +355,70 @@ public class AdverTizeBanner extends ViewGroup {
         adjustPostionAnim.addListener(new Animator.AnimatorListener() {
             @Override
             public void onAnimationStart(Animator animation) {
-                int position = (Integer) viewList.get(1).getTag();
+                //int position = (Integer) viewList.get(1).getTag();
 
-                if (initialVelocity < 0) {
-                    if (position + 1 < mAdapter.getCount()) {
-                        mAdapterPosition = position + 1;
-                    } else {
-                        mAdapterPosition = 0;
-                    }
-                } else {
-                    if (position == 0) {
-                        mAdapterPosition = mAdapter.getCount() - 1;
-                    } else {
-                        mAdapterPosition = position - 1;
-                    }
-                }
+//                if (initialVelocity < 0) {
+//                    if (mNextScreen != mCurrentScreen) {
+//                        mAdapterPosition++;
+//                        if (mAdapterPosition >= mAdapter.getCount()) {
+//                            mAdapterPosition = 0;
+//                        }
+//                    }
+//                    if (position + 1 < mAdapter.getCount()) {
+//                        mAdapterPosition = position + 1;
+//                    } else {
+//                        mAdapterPosition = 0;
+//                    }
+//                } else {
+//                    if (mCurrentScreen != mNextScreen) {
+//                        mAdapterPosition--;
+//                        if (mAdapterPosition < 0) {
+//                            mAdapterPosition = mAdapter.getCount() - 1;
+//                        }
+//                    }
+//                    if (position == 0) {
+//                        mAdapterPosition = mAdapter.getCount() - 1;
+//                    } else {
+//                        mAdapterPosition = position - 1;
+//                    }
+             //   }
 
 
             }
 
             @Override
             public void onAnimationEnd(Animator animation) {
-                int cur = (int) (getScrollX() / getWidth() + 0.5F);
-                mCurrentScreen = cur;
-                if (mCurrentScreen == 2 || mCurrentScreen == 0) {
-                    mCurrentScreen = 1;
-                    mAdapter.getView(mAdapterPosition, viewList.get(mCurrentScreen), mCurrentScreen);
-                    mAdapter.getView(mAdapterPosition == 0 ? mAdapter.getCount() - 1 : mAdapterPosition - 1, viewList.get(mCurrentScreen - 1), mCurrentScreen - 1);
-                    mAdapter.getView(mAdapterPosition == mAdapter.getCount() - 1 ? 0 : mAdapterPosition + 1, viewList.get(mCurrentScreen + 1), mCurrentScreen + 1);
-                    scrollTo(getWidth(), getScrollY());
+                //int cur = (int) (getScrollX() / getWidth() + 0.5F);
+                if (mCurrentScreen != mNextScreen) {
+
+                    if (mNextScreen < mCurrentScreen) {
+                        mCurrentScreen = 1;
+                        ViewHolder view2 = viewList.remove(2);
+                        view2.adapterPosition = getPreviousAdapterPosition();
+                        viewList.add(0, view2);
+                        mAdapter.getView(viewList.get(0).adapterPosition, viewList.get(0).view, 0);
+                    } else if (mNextScreen > mCurrentScreen) {
+                        mCurrentScreen = 1;
+                        ViewHolder view0 = viewList.remove(0);
+                        view0.adapterPosition = getNextAdapterPosition();
+                        viewList.add(view0);
+                        mAdapter.getView(viewList.get(2).adapterPosition, viewList.get(2).view, 2);
+                    }
+                    int width=getWidth();
+                    scrollTo(width, getScrollY());
+                    requestLayout();
+
+                    //
+
+
+//                    if (mCurrentScreen == 2 || mCurrentScreen == 0) {
+//                        mCurrentScreen = 1;
+//                        mAdapter.getView(viewList.get(mCurrentScreen).adapterPosition, viewList.get(mCurrentScreen).view, mCurrentScreen);
+//                        mAdapter.getView(mAdapterPosition == 0 ? mAdapter.getCount() - 1 : mAdapterPosition - 1, viewList.get(mCurrentScreen - 1).view, mCurrentScreen - 1);
+//                        mAdapter.getView(mAdapterPosition == mAdapter.getCount() - 1 ? 0 : mAdapterPosition + 1, viewList.get(mCurrentScreen + 1).view, mCurrentScreen + 1);
+//
+//
+//                    }
                 }
                 isCanceled = false;
                 start();
@@ -399,6 +454,8 @@ public class AdverTizeBanner extends ViewGroup {
         } else {
             targetPage = currentPage;
         }
+        System.out.println("next_page   "+targetPage);
+        System.out.println("current_page   "+mCurrentScreen);
         return targetPage;
     }
 
@@ -429,14 +486,6 @@ public class AdverTizeBanner extends ViewGroup {
 
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
-        dispatchLayout();
-    }
-
-    private void dispatchLayout() {
-        fill();
-    }
-
-    private void fill() {
         if (mAdapter == null) {
             throw new IllegalStateException("adapter can not be null");
         }
@@ -450,36 +499,39 @@ public class AdverTizeBanner extends ViewGroup {
             View temp = getViewFromPool(i);
             if (temp == null) {
                 View view = mAdapter.getView(i, temp, i);
-                viewList.add(i, view);
+
+                viewList.add(i, new ViewHolder(view, i, i));
                 addView(view);
                 measureChildWithMargins(view, 0, 0);
-                layoutChild(view, i);
+                layoutChild(view, i,l,t,r,b);
             } else {
-                layoutChild(viewList.get(i), i);
+                layoutChild(viewList.get(i).view, i,l,t,r,b);
             }
 
         }
     }
 
+
+
     private void updateAvailableSpace() {
-        availableSpace.left = getLeft() + getPaddingLeft();
-        availableSpace.top = getTop() + getPaddingTop();
-        availableSpace.right = getWidth() - getPaddingRight();
-        availableSpace.bottom = getHeight() - getPaddingBottom();
+        availableSpace.left = 0 + getPaddingLeft();
+        availableSpace.top = 0 + getPaddingTop();
+        availableSpace.right = availableSpace.left+getMeasuredWidth() - getPaddingRight();
+        availableSpace.bottom = availableSpace.top+getMeasuredHeight()- getPaddingBottom();
     }
 
 
     private View getViewFromPool(int position) {
         if (position < viewList.size()) {
-            return viewList.get(position);
+            return viewList.get(position).view;
         }
         return null;
     }
 
-    private void layoutChild(View view, int position) {
-        Rect rf = new Rect(availableSpace);
+    private void layoutChild(View view, int position,int l, int t, int r, int b) {
+        Rect rf = new Rect(l,t,r,b);
         int width = rf.width();
-        rf.left = rf.left + position * (rf.right - rf.left);
+        rf.left = rf.left + position *width;
         rf.right = rf.left + width;
         view.layout(rf.left, rf.top, rf.right, rf.bottom);
     }
@@ -559,15 +611,20 @@ public class AdverTizeBanner extends ViewGroup {
                         scrollTo(value, getScrollY());
                     }
                 });
+
                 autoScrollAnim.addListener(new Animator.AnimatorListener() {
                     @Override
                     public void onAnimationStart(Animator animation) {
-                        mAdapterPosition++;
-                        if (mAdapterPosition == mAdapter.getCount()) {
-                            mAdapterPosition = 0;
+//                        mAdapterPosition++;
+//                        if (mAdapterPosition == mAdapter.getCount()) {
+//                            mAdapterPosition = 0;
+//                        }
+
+                        mNextScreen = mCurrentScreen + 1;
+                        if (mNextScreen>2){
+                            mNextScreen=0;
                         }
-                        mCurrentScreen++;
-                        mAdapter.getView(mAdapterPosition, viewList.get(mCurrentScreen), mCurrentScreen);
+                        mAdapter.getView(viewList.get(mNextScreen).adapterPosition, viewList.get(mNextScreen).view, mNextScreen);
                     }
 
                     @Override
@@ -575,18 +632,20 @@ public class AdverTizeBanner extends ViewGroup {
                         if (isCanceled) {
                             return;
                         }
-
-
-                        if (mCurrentScreen == viewNum - 1) {
+                        mCurrentScreen = mNextScreen;
+                        if (mCurrentScreen == 2) {
                             mCurrentScreen = 1;
 //                            mAdapter.getView(mAdapterPosition, viewList.get(mCurrentScreen), mCurrentScreen);
 //                            mAdapter.getView(mAdapterPosition == 0 ? mAdapter.getCount() - 1 : mAdapterPosition - 1, viewList.get(mCurrentScreen - 1), mCurrentScreen - 1);
-
-                            switchView(1, 2);
-                            // invalidate();
-                            //requestLayout();
+                            // switchView(1, 2);
+                            ViewHolder v0 = viewList.remove(0);
+                            v0.adapterPosition = getNextAdapterPosition();
+                            viewList.add(v0);
                             scrollTo(getWidth(), getScrollY());
                             requestLayout();
+                            mAdapter.getView(viewList.get(2).adapterPosition, viewList.get(2).view, 2);
+                        } else {
+
                         }
                         start();
                     }
@@ -624,8 +683,8 @@ public class AdverTizeBanner extends ViewGroup {
         if (viewList != null && Math.max(p1, p2) < viewList.size()) {
 
 
-            View v2 = viewList.remove(p2);
-            View v1 = viewList.remove(p1);
+            ViewHolder v2 = viewList.remove(p2);
+            ViewHolder v1 = viewList.remove(p1);
             viewList.add(p1, v2);
             viewList.add(p2, v1);
         }
@@ -639,5 +698,37 @@ public class AdverTizeBanner extends ViewGroup {
     public float dp2px(Context context, float dp) {
         final float scale = context.getResources().getDisplayMetrics().density;
         return dp * scale + 0.5f;
+    }
+
+    private int getNextAdapterPosition() {
+            int pos=viewList.get(viewList.size()-1).adapterPosition;
+        if (pos + 1 >= mAdapter.getCount()) {
+            return 0;
+        } else {
+            return pos + 1;
+        }
+
+    }
+
+    private int getPreviousAdapterPosition() {
+        int pos=viewList.get(0).adapterPosition;
+        if (pos - 1 < 0) {
+            return mAdapter.getCount() - 1;
+        } else {
+            return pos - 1;
+        }
+    }
+
+
+    class ViewHolder {
+        public int adapterPosition = -1;
+        public int viewPosition = -1;
+        public View view;
+
+        public ViewHolder(View view, int viewPosition, int adapterPosition) {
+            this.adapterPosition = adapterPosition;
+            this.view = view;
+            this.viewPosition = viewPosition;
+        }
     }
 }

@@ -282,7 +282,6 @@ public class AdverTizeBanner extends ViewGroup {
     private boolean performDrag(float x) {
         final float deltaX = mLastMotionX - x;
         mLastMotionX = x;
-
         float oldScrollX = getScrollX();
         float scrollX = oldScrollX + deltaX;
         mLastMotionX += scrollX - (int) scrollX;

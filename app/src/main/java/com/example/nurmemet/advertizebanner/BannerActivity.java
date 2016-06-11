@@ -1,9 +1,14 @@
 package com.example.nurmemet.advertizebanner;
 
 import android.app.Activity;
+import android.content.Context;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
+
+import com.bigkoo.convenientbanner.holder.Holder;
 
 import java.util.ArrayList;
 
@@ -14,21 +19,13 @@ public class BannerActivity extends Activity {
     AdverTizeBanner banner;
     BannerAdapter mAdapter;
     ArrayList<String> imageUrlList = new ArrayList<String>();
-    Button refresh;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.banner_activity);
         banner = (AdverTizeBanner) findViewById(R.id.banner_view);
-        refresh=(Button) findViewById(R.id.refresh);
-        refresh.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                imageUrlList.remove(0);
-                banner.requestLayout();
-            }
-        });
+
         initDatas();
         mAdapter = new BannerAdapter(this, imageUrlList);
         banner.setAdapter(mAdapter);

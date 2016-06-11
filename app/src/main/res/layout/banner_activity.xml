@@ -5,20 +5,32 @@
               android:orientation="vertical"
     >
 
-    <com.example.nurmemet.advertizebanner.AdverTizeBanner
-        android:id="@+id/banner_view"
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="200dp"
-        android:background="@color/red"
-        />
+        android:layout_height="match_parent"
+        >
 
-    <Button
-        android:id="@+id/refresh"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:text="刷新"
-        />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            >
+
+            <com.example.nurmemet.advertizebanner.AdverTizeBanner
+                android:id="@+id/banner_view"
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:background="@color/red"
+                />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="1000dp"
+                android:text="sdfsdlfjsdlfkjdlskfsldk"
+                android:gravity="bottom"
+                />
+
+        </LinearLayout>
+    </ScrollView>
 
 
 </LinearLayout>

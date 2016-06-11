@@ -66,4 +66,6 @@ public class BannerAdapter extends AdverTizeBanner.BannerAdapter {
                 img, options);
         return mainView;
     }
+
+
 }

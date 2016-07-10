@@ -46,7 +46,7 @@ public class BannerAdapter extends AdverTizeBanner.BannerAdapter {
     }
 
     @Override
-    public View getView(int position, View mainView, int chilIndex) {
+    public View getView(int position, View mainView) {
 
         if (mainView == null) {
             mainView = LayoutInflater.from(mCotext).inflate(R.layout.banner_item, null);
@@ -56,7 +56,6 @@ public class BannerAdapter extends AdverTizeBanner.BannerAdapter {
 
         ImageView img = (ImageView) mainView.findViewById(R.id.test);
         TextView tv = (TextView) mainView.findViewById(R.id.index);
-        tv.setText("" + chilIndex);
 //        AQuery aq = new AQuery(mainView);
 //
 //        aq.id(R.id.test).image(url.get(position),true,true);

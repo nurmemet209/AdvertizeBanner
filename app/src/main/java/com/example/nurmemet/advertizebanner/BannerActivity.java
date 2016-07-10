@@ -5,10 +5,10 @@ import android.content.Context;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.AbsListView;
 import android.widget.Button;
 import android.widget.ImageView;
 
-import com.bigkoo.convenientbanner.holder.Holder;
 
 import java.util.ArrayList;
 
@@ -27,10 +27,33 @@ public class BannerActivity extends Activity {
         banner = (AdverTizeBanner) findViewById(R.id.banner_view);
 
         initDatas();
+        init();
         mAdapter = new BannerAdapter(this, imageUrlList);
         banner.setAdapter(mAdapter);
         banner.start();
+        banner.setOnPageChangedListener(new AdverTizeBanner.OnPageChangedListener() {
+            @Override
+            public void OnPageChange(int position) {
+                System.out.println("banner" + position);
+            }
+        });
 
+        findViewById(R.id.click).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                imageUrlList.remove(1);
+                mAdapter.notifyDataSetChanged();
+            }
+        });
+
+        findViewById(R.id.click_).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                imageUrlList
+                        .add("http://g.hiphotos.baidu.com/image/pic/item/b3119313b07eca80131de3e6932397dda1448393.jpg");
+                mAdapter.notifyDataSetChanged();
+            }
+        });
     }
 
     private void initDatas() {
@@ -44,17 +67,16 @@ public class BannerActivity extends Activity {
                 .add("http://g.hiphotos.baidu.com/image/pic/item/b3119313b07eca80131de3e6932397dda1448393.jpg");
 
 
-
-
-
-
-
     }
 
 
+    private void init() {
+        int a = 0;
+        System.out.println(a++);
+        System.out.println(a);
 
 
-
+    }
 
 
 }

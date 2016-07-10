@@ -3,8 +3,10 @@ package com.example.nurmemet.advertizebanner;
 import android.animation.Animator;
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.database.Observable;
 import android.graphics.Rect;
 import android.os.Handler;
+import android.os.Parcelable;
 import android.support.v4.view.MotionEventCompat;
 import android.support.v4.view.VelocityTrackerCompat;
 import android.util.AttributeSet;
@@ -15,6 +17,7 @@ import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.Interpolator;
+import android.widget.LinearLayout;
 
 import java.util.ArrayList;
 
@@ -22,7 +25,8 @@ import java.util.ArrayList;
  * Created by nurmemet on 2015/12/12.
  */
 public class AdverTizeBanner extends ViewGroup {
-    private int ANIM_DURATION = 700;
+    private int mDuration = 300;
+    private int mDelay = 3000;
     private Interpolator mAnimInterpolator = new DecelerateInterpolator();
     private static final int MIN_DISTANCE_FOR_FLING = 25; // dips
     private static final int MIN_FLING_VELOCITY = 400; // dips
@@ -39,7 +43,6 @@ public class AdverTizeBanner extends ViewGroup {
     private boolean mIsBeingDragged;
     private int mActivePointerId = INVALID_POINTER;
     private static final int INVALID_POINTER = -1;
-    private int mDuration = 700;
     private Handler handler;
     private int mCurrentScreen;
     private int mNextScreen;
@@ -47,6 +50,9 @@ public class AdverTizeBanner extends ViewGroup {
     ValueAnimator autoScrollAnim;
     ValueAnimator adjustPostionAnim;
     private static float OVER_PAGE_FLAG = 0.9f;
+    private boolean isAutoScrolling = false;
+    private OnPageChangedListener onPageChangedListener;
+    private BannerDataObserver mObserver = new BannerDataObserver();
 
 
     public AdverTizeBanner(Context context) {
@@ -64,8 +70,11 @@ public class AdverTizeBanner extends ViewGroup {
         init();
     }
 
-    private void init() {
+    public void setOnPageChangedListener(OnPageChangedListener onPageChangedListener) {
+        this.onPageChangedListener = onPageChangedListener;
+    }
 
+    private void init() {
         final ViewConfiguration configuration = ViewConfiguration
                 .get(getContext());
         mTouchSlop = configuration.getScaledTouchSlop();
@@ -79,6 +88,10 @@ public class AdverTizeBanner extends ViewGroup {
         mDuration = duration;
     }
 
+    public void setDelay(int delay) {
+        this.mDelay = delay;
+    }
+
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
         return true;
@@ -87,6 +100,9 @@ public class AdverTizeBanner extends ViewGroup {
 
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
+        if (mAdapter.getCount() < 2) {
+            return false;
+        }
 
         int action = MotionEventCompat.getActionMasked(ev);
         if (action == MotionEvent.ACTION_DOWN && ev.getEdgeFlags() != 0) {
@@ -105,8 +121,6 @@ public class AdverTizeBanner extends ViewGroup {
             return false;
         }
         mVelocityTracker.addMovement(ev);
-
-
         switch (action) {
             case MotionEvent.ACTION_DOWN: {
                 mLastMotionX = mInitialMotionX = ev.getX();
@@ -114,7 +128,6 @@ public class AdverTizeBanner extends ViewGroup {
                 mActivePointerId = MotionEventCompat.getPointerId(ev, 0);
                 if (autoScrollAnim != null && autoScrollAnim.isRunning()) {
                     autoScrollAnim.cancel();
-
                 }
                 resetPosition(ev.getX());
                 handler.removeCallbacksAndMessages(null);
@@ -133,7 +146,6 @@ public class AdverTizeBanner extends ViewGroup {
                     final float yDiff = Math.abs(y - mLastMotionY);
                     if (xDiff > mTouchSlop && xDiff > yDiff) {
                         mIsBeingDragged = true;
-
                         mLastMotionX = x - mInitialMotionX > 0 ? mInitialMotionX + mTouchSlop :
                                 mInitialMotionX - mTouchSlop;
                         mLastMotionY = y;
@@ -170,6 +182,16 @@ public class AdverTizeBanner extends ViewGroup {
         return true;
     }
 
+    @Override
+    protected Parcelable onSaveInstanceState() {
+        return super.onSaveInstanceState();
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Parcelable state) {
+        super.onRestoreInstanceState(state);
+    }
+
     private void resetPosition(float x) {
         float scrollX = getScrollX();
         //如果当前屏幕是最后一个屏幕，为了防止手动拖动时拖出屏幕外把当前屏幕移到中间
@@ -180,7 +202,7 @@ public class AdverTizeBanner extends ViewGroup {
             viewList.add(view0);
             scrollBy(-getWidth(), 0);
             requestLayout();
-            mAdapter.getView(viewList.get(2).adapterPosition, viewList.get(2).view, 2);
+            mAdapter.getView(viewList.get(2).adapterPosition, viewList.get(2).view);
             mCurrentScreen = 1;
             //如果当前屏幕是第一个屏幕，为了防止手动拖动时拖出屏幕外把当前屏幕移到中间，即mCurrentScreen 1
         } else if (scrollX - (getMeasuredWidth() - x) < 0) {
@@ -193,7 +215,7 @@ public class AdverTizeBanner extends ViewGroup {
             scrollBy(getWidth(), 0);
             requestLayout();
             //第一个视图加载数据
-            mAdapter.getView(viewList.get(0).adapterPosition, viewList.get(0).view, 0);
+            mAdapter.getView(viewList.get(0).adapterPosition, viewList.get(0).view);
         }
     }
 
@@ -206,7 +228,7 @@ public class AdverTizeBanner extends ViewGroup {
         mNextScreen = nextPage;
         final int x = nextPage * getWidth();
         double p = getScrollX() / getWidth();
-        double duration = (1 - (p - (int) p)) * ANIM_DURATION;
+        double duration = (1 - (p - (int) p)) * mDuration;
         adjustPostionAnim = ValueAnimator.ofInt(getScrollX(), x);
         adjustPostionAnim.setDuration((int) duration);
         adjustPostionAnim.setInterpolator(mAnimInterpolator);
@@ -231,19 +253,20 @@ public class AdverTizeBanner extends ViewGroup {
                         ViewHolder view2 = viewList.remove(2);
                         view2.adapterPosition = getPreviousAdapterPosition();
                         viewList.add(0, view2);
-                        mAdapter.getView(viewList.get(0).adapterPosition, viewList.get(0).view, 0);
+                        mAdapter.getView(viewList.get(0).adapterPosition, viewList.get(0).view);
                     } else if (mNextScreen > mCurrentScreen) {
                         mCurrentScreen = 1;
                         ViewHolder view0 = viewList.remove(0);
                         view0.adapterPosition = getNextAdapterPosition();
                         viewList.add(view0);
-                        mAdapter.getView(viewList.get(2).adapterPosition, viewList.get(2).view, 2);
+                        mAdapter.getView(viewList.get(2).adapterPosition, viewList.get(2).view);
                     }
                     int width = getWidth();
                     scrollTo(width, getScrollY());
                     requestLayout();
                 }
                 isCanceled = false;
+                onPageChanged(viewList.get(1).adapterPosition);
                 start();
             }
 
@@ -304,9 +327,9 @@ public class AdverTizeBanner extends ViewGroup {
         for (int i = 0; i < 3; i++) {
             View temp = getViewFromPool(i);
             if (temp == null) {
-                View view = mAdapter.getView(i, temp, i);
+                View view = mAdapter.getView(i >= mAdapter.getCount() ? 0 : i, temp);
 
-                viewList.add(i, new ViewHolder(view, i, i));
+                viewList.add(i, new ViewHolder(view, i, i >= mAdapter.getCount() ? 0 : i));
                 addView(view);
                 measureChildWithMargins(view);
                 layoutChild(view, i, l, t, r, b);
@@ -346,10 +369,15 @@ public class AdverTizeBanner extends ViewGroup {
         return MeasureSpec.makeMeasureSpec(resultSize, resultMode);
     }
 
+    @Override
+    protected LayoutParams generateDefaultLayoutParams() {
+        return new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+    }
 
     public void setAdapter(BannerAdapter adapter) {
         if (adapter != null) {
             mAdapter = adapter;
+            mAdapter.registerAdapterDataObserver(mObserver);
         } else {
             throw new IllegalStateException("adapter can not be null");
         }
@@ -362,31 +390,25 @@ public class AdverTizeBanner extends ViewGroup {
     }
 
 
-    public static abstract class BannerAdapter {
-        public BannerAdapter() {
-        }
-
-        abstract public int getCount();
-
-        abstract public View getView(int position, View mainView, int childIndex);
-
-        public void notifyDataSetChannged() {
-        }
-
-    }
-
     private boolean isCanceled = false;
 
     public void start() {
+        if (isAutoScrolling) {
+            isAutoScrolling = false;
+            return;
+        }
+        if (mAdapter.getCount() < 2) {
+            return;
+        }
+        isAutoScrolling = true;
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
 
                 int fromX = mCurrentScreen * getWidth();
                 int toX = (mCurrentScreen + 1) * getWidth();
-
                 autoScrollAnim = ValueAnimator.ofInt(fromX, toX);
-                autoScrollAnim.setDuration(ANIM_DURATION);
+                autoScrollAnim.setDuration(mDuration);
                 autoScrollAnim.setInterpolator(mAnimInterpolator);
                 autoScrollAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
                     @Override
@@ -403,7 +425,7 @@ public class AdverTizeBanner extends ViewGroup {
                         if (mNextScreen > 2) {
                             mNextScreen = 0;
                         }
-                        mAdapter.getView(viewList.get(mNextScreen).adapterPosition, viewList.get(mNextScreen).view, mNextScreen);
+                        mAdapter.getView(viewList.get(mNextScreen).adapterPosition, viewList.get(mNextScreen).view);
                     }
 
                     @Override
@@ -419,10 +441,11 @@ public class AdverTizeBanner extends ViewGroup {
                             viewList.add(v0);
                             scrollTo(getWidth(), getScrollY());
                             requestLayout();
-                            mAdapter.getView(viewList.get(2).adapterPosition, viewList.get(2).view, 2);
+                            mAdapter.getView(viewList.get(2).adapterPosition, viewList.get(2).view);
                         } else {
 
                         }
+                        onPageChanged(viewList.get(1).adapterPosition);
                         start();
                     }
 
@@ -437,10 +460,8 @@ public class AdverTizeBanner extends ViewGroup {
                     }
                 });
                 autoScrollAnim.start();
-
-
             }
-        }, 3000);
+        }, mDelay);
     }
 
 
@@ -485,4 +506,82 @@ public class AdverTizeBanner extends ViewGroup {
             this.viewPosition = viewPosition;
         }
     }
+
+
+    public interface OnPageChangedListener {
+        void OnPageChange(int position);
+    }
+
+    private void onPageChanged(int postion) {
+        if (onPageChangedListener != null) {
+            onPageChangedListener.OnPageChange(postion);
+        }
+    }
+
+    /**
+     * 具体目标
+     */
+    static class AdapterDataObservable extends Observable<AdapterDataObserver> {
+        public void notifyChanged() {
+            synchronized (mObservers) {
+                for (int i = mObservers.size() - 1; i >= 0; i--) {
+                    mObservers.get(i).onChanged();
+                }
+            }
+        }
+    }
+
+    /**
+     * 观察者
+     */
+    public static abstract class AdapterDataObserver {
+        public void onChanged() {
+            // Do nothing
+        }
+
+    }
+
+    /**
+     * 具体观察者
+     */
+    private class BannerDataObserver extends AdapterDataObserver {
+        public void onChanged() {
+            handler.removeCallbacksAndMessages(null);
+            mCurrentScreen = 0;
+            mNextScreen = 0;
+            viewList.clear();
+            scrollTo(0, getScrollY());
+            requestLayout();
+            start();
+
+        }
+    }
+
+
+    public static abstract class BannerAdapter {
+
+        private final AdapterDataObservable mObservable = new AdapterDataObservable();
+
+        public BannerAdapter() {
+        }
+
+        abstract public int getCount();
+
+        abstract public View getView(int position, View mainView);
+
+
+        public void registerAdapterDataObserver(AdapterDataObserver observer) {
+            mObservable.registerObserver(observer);
+        }
+
+        public void unregisterAdapterDataObserver(AdapterDataObserver observer) {
+            mObservable.unregisterObserver(observer);
+        }
+
+        public void notifyDataSetChanged() {
+            mObservable.notifyChanged();
+        }
+
+    }
+
 }

@@ -22,11 +22,24 @@
                 android:layout_height="200dp"
                 android:background="@color/red"
                 />
-            <TextView
+            <Button
+                android:id="@+id/click"
                 android:layout_width="match_parent"
-                android:layout_height="1000dp"
-                android:text="sdfsdlfjsdlfkjdlskfsldk"
-                android:gravity="bottom"
+                android:layout_height="wrap_content"
+                android:text="刷新 --"
+                android:layout_marginTop="100dp"
+                android:gravity="center"
+
+                />
+
+            <Button
+                android:id="@+id/click_"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="刷新 ++"
+                android:layout_marginTop="100dp"
+                android:gravity="center"
+
                 />
 
         </LinearLayout>

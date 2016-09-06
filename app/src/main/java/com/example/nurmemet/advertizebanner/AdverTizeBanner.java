@@ -25,8 +25,8 @@ import java.util.ArrayList;
  * Created by nurmemet on 2015/12/12.
  */
 public class AdverTizeBanner extends ViewGroup {
-    private int mDuration = 300;
-    private int mDelay = 3000;
+    private int mDuration = 250;
+    private int mDelay = 5000;
     private Interpolator mAnimInterpolator = new DecelerateInterpolator();
     private static final int MIN_DISTANCE_FOR_FLING = 25; // dips
     private static final int MIN_FLING_VELOCITY = 400; // dips
@@ -50,10 +50,12 @@ public class AdverTizeBanner extends ViewGroup {
     ValueAnimator autoScrollAnim;
     ValueAnimator adjustPostionAnim;
     private static float OVER_PAGE_FLAG = 0.9f;
-    private boolean isAutoScrolling = false;
+    private boolean isAutoScroll = false;
     private OnPageChangedListener onPageChangedListener;
     private BannerDataObserver mObserver = new BannerDataObserver();
 
+    private boolean isClick = false;
+    private boolean isRunning = false;
 
     public AdverTizeBanner(Context context) {
         super(context);
@@ -92,18 +94,135 @@ public class AdverTizeBanner extends ViewGroup {
         this.mDelay = delay;
     }
 
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        boolean b = super.dispatchTouchEvent(ev);
+
+        return b;
+    }
+
+    private void stop() {
+        isRunning = false;
+        handler.removeCallbacksAndMessages(null);
+    }
+
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-        return true;
+            if (mAdapter.getCount()<2){
+                return false;
+            }
+
+         /*
+         * This method JUST determines whether we want to intercept the motion.
+         * If we return true, onMotionEvent will be called and we do the actual
+         * scrolling there.
+         */
+
+        final int action = ev.getAction() & MotionEventCompat.ACTION_MASK;
+
+        // Always take care of the touch gesture being complete.
+        if (action == MotionEvent.ACTION_CANCEL || action == MotionEvent.ACTION_UP) {
+            // Release the drag.
+            resetTouch();
+            return false;
+        }
+
+        // Nothing more to do here if we have decided whether or not we
+        // are dragging.
+        if (action != MotionEvent.ACTION_DOWN) {
+            if (mIsBeingDragged) {
+                return true;
+            }
+        }
+
+
+        switch (action) {
+            case MotionEvent.ACTION_DOWN: {
+
+                mLastMotionX = mInitialMotionX = ev.getX();
+                mLastMotionY = mInitialMotionY = ev.getY();
+                mActivePointerId = MotionEventCompat.getPointerId(ev, 0);
+                if (autoScrollAnim != null && autoScrollAnim.isRunning()) {
+                    autoScrollAnim.cancel();
+                }
+                // requestDisallowInterceptTouchEvent(true);
+                resetPosition(ev.getX());
+                //rotate();
+
+
+            }
+            break;
+            case MotionEvent.ACTION_MOVE: {
+                final int pointerIndex = MotionEventCompat.findPointerIndex(ev, mActivePointerId);
+                if (pointerIndex == -1) {
+                    resetTouch();
+                    break;
+                }
+                final float x = MotionEventCompat.getX(ev, pointerIndex);
+                final float xDiff = Math.abs(x - mLastMotionX);
+                final float y = MotionEventCompat.getY(ev, pointerIndex);
+                final float yDiff = Math.abs(y - mLastMotionY);
+                if (xDiff > mTouchSlop && xDiff > yDiff) {
+                    mIsBeingDragged = true;
+                    mLastMotionX = x - mInitialMotionX > 0 ? mInitialMotionX + mTouchSlop :
+                            mInitialMotionX - mTouchSlop;
+                    mLastMotionY = y;
+                    // Disallow Parent Intercept, just in case
+                    requestDisallowInterceptTouchEvent(true);
+                } else {
+                    rotate();
+                }
+
+                if (mIsBeingDragged) {
+                    final int activePointerIndex = MotionEventCompat.findPointerIndex(
+                            ev, mActivePointerId);
+                    final float x_ = MotionEventCompat.getX(ev, activePointerIndex);
+                    performDrag(x_);
+
+                }
+            }
+
+            break;
+            case MotionEvent.ACTION_CANCEL:
+            case MotionEvent.ACTION_UP:
+                if (mIsBeingDragged) {
+                    final VelocityTracker velocityTracker = mVelocityTracker;
+                    velocityTracker.computeCurrentVelocity(1000, mMaximumVelocity);
+                    int initialVelocity = (int) VelocityTrackerCompat.getXVelocity(
+                            velocityTracker, mActivePointerId);
+                    final int activePointerIndex =
+                            MotionEventCompat.findPointerIndex(ev, mActivePointerId);
+                    final float x = MotionEventCompat.getX(ev, activePointerIndex);
+                    final int totalDelta = (int) (x - mInitialMotionX);
+                    int nextPage = determineTargetPage(mCurrentScreen, initialVelocity,
+                            totalDelta);
+                    setCurrentItemInternal(nextPage, true, initialVelocity);
+                    resetTouch();
+                } else {
+
+                }
+                isClick = false;
+                break;
+        }
+        return mIsBeingDragged;
     }
 
 
     @Override
+    public boolean canScrollHorizontally(int direction) {
+        return true;
+    }
+
+    @Override
     public boolean onTouchEvent(MotionEvent ev) {
+
+        if (!mIsBeingDragged) {
+            return false;
+        }
         if (mAdapter.getCount() < 2) {
             return false;
         }
-
         int action = MotionEventCompat.getActionMasked(ev);
         if (action == MotionEvent.ACTION_DOWN && ev.getEdgeFlags() != 0) {
             // Don't handle edge touches immediately -- they may actually belong to one of our
@@ -123,6 +242,7 @@ public class AdverTizeBanner extends ViewGroup {
         mVelocityTracker.addMovement(ev);
         switch (action) {
             case MotionEvent.ACTION_DOWN: {
+                mIsBeingDragged = false;
                 mLastMotionX = mInitialMotionX = ev.getX();
                 mLastMotionY = mInitialMotionY = ev.getY();
                 mActivePointerId = MotionEventCompat.getPointerId(ev, 0);
@@ -130,7 +250,7 @@ public class AdverTizeBanner extends ViewGroup {
                     autoScrollAnim.cancel();
                 }
                 resetPosition(ev.getX());
-                handler.removeCallbacksAndMessages(null);
+                stop();
                 break;
             }
             case MotionEvent.ACTION_MOVE:
@@ -163,7 +283,7 @@ public class AdverTizeBanner extends ViewGroup {
                 break;
             case MotionEvent.ACTION_CANCEL:
             case MotionEvent.ACTION_UP:
-                if (true) {
+                if (mIsBeingDragged) {
                     final VelocityTracker velocityTracker = mVelocityTracker;
                     velocityTracker.computeCurrentVelocity(1000, mMaximumVelocity);
                     int initialVelocity = (int) VelocityTrackerCompat.getXVelocity(
@@ -267,7 +387,11 @@ public class AdverTizeBanner extends ViewGroup {
                 }
                 isCanceled = false;
                 onPageChanged(viewList.get(1).adapterPosition);
-                start();
+                if (isAutoScroll) {
+                    rotate();
+                }
+
+
             }
 
 
@@ -322,7 +446,7 @@ public class AdverTizeBanner extends ViewGroup {
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         if (mAdapter == null) {
-            throw new IllegalStateException("adapter can not be null");
+            return;
         }
         for (int i = 0; i < 3; i++) {
             View temp = getViewFromPool(i);
@@ -392,15 +516,9 @@ public class AdverTizeBanner extends ViewGroup {
 
     private boolean isCanceled = false;
 
-    public void start() {
-        if (isAutoScrolling) {
-            isAutoScrolling = false;
-            return;
-        }
-        if (mAdapter.getCount() < 2) {
-            return;
-        }
-        isAutoScrolling = true;
+    private void rotate() {
+
+        handler.removeCallbacksAndMessages(null);
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
@@ -446,7 +564,10 @@ public class AdverTizeBanner extends ViewGroup {
 
                         }
                         onPageChanged(viewList.get(1).adapterPosition);
-                        start();
+                        if (isAutoScroll){
+                            rotate();
+                        }
+
                     }
 
                     @Override
@@ -462,6 +583,19 @@ public class AdverTizeBanner extends ViewGroup {
                 autoScrollAnim.start();
             }
         }, mDelay);
+    }
+
+    public void start() {
+        isAutoScroll = true;
+        if (isRunning) {
+            return;
+        }
+        if (mAdapter.getCount() < 2) {
+            return;
+        }
+        isRunning = true;
+        rotate();
+
     }
 
 
@@ -552,7 +686,14 @@ public class AdverTizeBanner extends ViewGroup {
             viewList.clear();
             scrollTo(0, getScrollY());
             requestLayout();
-            start();
+            if (isAutoScroll) {
+                isRunning = false;
+                rotate();
+            }
+
+            if (onPageChangedListener != null) {
+                onPageChangedListener.OnPageChange(0);
+            }
 
         }
     }

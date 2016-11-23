@@ -1,11 +1,10 @@
-package com.example.nurmemet.advertizebanner;
+package com.cn.advertizebanner;
 
 import android.animation.Animator;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.database.Observable;
 import android.graphics.Rect;
-import android.os.Handler;
 import android.os.Parcelable;
 import android.support.v4.view.MotionEventCompat;
 import android.support.v4.view.VelocityTrackerCompat;
@@ -43,7 +42,7 @@ public class AdverTizeBanner extends ViewGroup {
     private boolean mIsBeingDragged;
     private int mActivePointerId = INVALID_POINTER;
     private static final int INVALID_POINTER = -1;
-    private Handler handler;
+    //private Handler handler;
     private int mCurrentScreen;
     private int mNextScreen;
     private ArrayList<ViewHolder> viewList = new ArrayList<ViewHolder>();
@@ -76,12 +75,16 @@ public class AdverTizeBanner extends ViewGroup {
         this.onPageChangedListener = onPageChangedListener;
     }
 
+    public int getCurrentPosition() {
+        return mCurrentScreen;
+    }
+
     private void init() {
         final ViewConfiguration configuration = ViewConfiguration
                 .get(getContext());
         mTouchSlop = configuration.getScaledTouchSlop();
         mMaximumVelocity = configuration.getScaledMaximumFlingVelocity();
-        handler = new Handler();
+        //handler = new Handler();
         mFlingDistance = (int) dp2px(getContext(), MIN_DISTANCE_FOR_FLING);
         mMinimumVelocity = (int) dp2px(getContext(), MIN_FLING_VELOCITY);
     }
@@ -104,14 +107,15 @@ public class AdverTizeBanner extends ViewGroup {
 
     private void stop() {
         isRunning = false;
-        handler.removeCallbacksAndMessages(null);
+        //handler.removeCallbacksAndMessages(null);
+        removeCallbacks(mRunnable);
     }
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-            if (mAdapter.getCount()<2){
-                return false;
-            }
+        if (mAdapter.getCount() < 2) {
+            return false;
+        }
 
          /*
          * This method JUST determines whether we want to intercept the motion.
@@ -322,7 +326,7 @@ public class AdverTizeBanner extends ViewGroup {
             viewList.add(view0);
             scrollBy(-getWidth(), 0);
             requestLayout();
-            mAdapter.getView(viewList.get(2).adapterPosition, viewList.get(2).view);
+            mAdapter.getView(viewList.get(2).adapterPosition, viewList.get(2).view, AdverTizeBanner.this);
             mCurrentScreen = 1;
             //如果当前屏幕是第一个屏幕，为了防止手动拖动时拖出屏幕外把当前屏幕移到中间，即mCurrentScreen 1
         } else if (scrollX - (getMeasuredWidth() - x) < 0) {
@@ -335,7 +339,7 @@ public class AdverTizeBanner extends ViewGroup {
             scrollBy(getWidth(), 0);
             requestLayout();
             //第一个视图加载数据
-            mAdapter.getView(viewList.get(0).adapterPosition, viewList.get(0).view);
+            mAdapter.getView(viewList.get(0).adapterPosition, viewList.get(0).view, AdverTizeBanner.this);
         }
     }
 
@@ -373,13 +377,13 @@ public class AdverTizeBanner extends ViewGroup {
                         ViewHolder view2 = viewList.remove(2);
                         view2.adapterPosition = getPreviousAdapterPosition();
                         viewList.add(0, view2);
-                        mAdapter.getView(viewList.get(0).adapterPosition, viewList.get(0).view);
+                        mAdapter.getView(viewList.get(0).adapterPosition, viewList.get(0).view, AdverTizeBanner.this);
                     } else if (mNextScreen > mCurrentScreen) {
                         mCurrentScreen = 1;
                         ViewHolder view0 = viewList.remove(0);
                         view0.adapterPosition = getNextAdapterPosition();
                         viewList.add(view0);
-                        mAdapter.getView(viewList.get(2).adapterPosition, viewList.get(2).view);
+                        mAdapter.getView(viewList.get(2).adapterPosition, viewList.get(2).view, AdverTizeBanner.this);
                     }
                     int width = getWidth();
                     scrollTo(width, getScrollY());
@@ -451,7 +455,7 @@ public class AdverTizeBanner extends ViewGroup {
         for (int i = 0; i < 3; i++) {
             View temp = getViewFromPool(i);
             if (temp == null) {
-                View view = mAdapter.getView(i >= mAdapter.getCount() ? 0 : i, temp);
+                View view = mAdapter.getView(i >= mAdapter.getCount() ? 0 : i, temp, AdverTizeBanner.this);
 
                 viewList.add(i, new ViewHolder(view, i, i >= mAdapter.getCount() ? 0 : i));
                 addView(view);
@@ -516,73 +520,87 @@ public class AdverTizeBanner extends ViewGroup {
 
     private boolean isCanceled = false;
 
-    private void rotate() {
 
-        handler.removeCallbacksAndMessages(null);
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
+    private Runnable mRunnable = new Runnable() {
+        @Override
+        public void run() {
 
-                int fromX = mCurrentScreen * getWidth();
-                int toX = (mCurrentScreen + 1) * getWidth();
-                autoScrollAnim = ValueAnimator.ofInt(fromX, toX);
-                autoScrollAnim.setDuration(mDuration);
-                autoScrollAnim.setInterpolator(mAnimInterpolator);
-                autoScrollAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                    @Override
-                    public void onAnimationUpdate(ValueAnimator animation) {
-                        int value = (Integer) animation.getAnimatedValue();
-                        scrollTo(value, getScrollY());
+            int fromX = mCurrentScreen * getWidth();
+            int toX = (mCurrentScreen + 1) * getWidth();
+            autoScrollAnim = ValueAnimator.ofInt(fromX, toX);
+            autoScrollAnim.setDuration(mDuration);
+            autoScrollAnim.setInterpolator(mAnimInterpolator);
+            autoScrollAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                @Override
+                public void onAnimationUpdate(ValueAnimator animation) {
+                    int value = (Integer) animation.getAnimatedValue();
+                    scrollTo(value, getScrollY());
+                }
+            });
+
+            autoScrollAnim.addListener(new Animator.AnimatorListener() {
+                @Override
+                public void onAnimationStart(Animator animation) {
+                    if (viewList.isEmpty()){
+                        return;
                     }
-                });
-
-                autoScrollAnim.addListener(new Animator.AnimatorListener() {
-                    @Override
-                    public void onAnimationStart(Animator animation) {
-                        mNextScreen = mCurrentScreen + 1;
-                        if (mNextScreen > 2) {
-                            mNextScreen = 0;
-                        }
-                        mAdapter.getView(viewList.get(mNextScreen).adapterPosition, viewList.get(mNextScreen).view);
+                    mNextScreen = mCurrentScreen + 1;
+                    if (mNextScreen > 2) {
+                        mNextScreen = 0;
                     }
+                    mAdapter.getView(viewList.get(mNextScreen).adapterPosition, viewList.get(mNextScreen).view, AdverTizeBanner.this);
+                }
 
-                    @Override
-                    public void onAnimationEnd(Animator animation) {
-                        if (isCanceled) {
-                            return;
-                        }
-                        mCurrentScreen = mNextScreen;
-                        if (mCurrentScreen == 2) {
-                            mCurrentScreen = 1;
-                            ViewHolder v0 = viewList.remove(0);
-                            v0.adapterPosition = getNextAdapterPosition();
-                            viewList.add(v0);
-                            scrollTo(getWidth(), getScrollY());
-                            requestLayout();
-                            mAdapter.getView(viewList.get(2).adapterPosition, viewList.get(2).view);
-                        } else {
-
-                        }
-                        onPageChanged(viewList.get(1).adapterPosition);
-                        if (isAutoScroll){
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    if (viewList.isEmpty()){
+                        if (isAutoScroll) {
                             rotate();
                         }
+                        return;
+                    }
+                    if (isCanceled) {
+                        return;
+                    }
+                    mCurrentScreen = mNextScreen;
+                    if (mCurrentScreen == 2) {
+                        mCurrentScreen = 1;
+                        ViewHolder v0 = viewList.remove(0);
+                        v0.adapterPosition = getNextAdapterPosition();
+                        viewList.add(v0);
+                        scrollTo(getWidth(), getScrollY());
+                        requestLayout();
+                        mAdapter.getView(viewList.get(2).adapterPosition, viewList.get(2).view, AdverTizeBanner.this);
+                    } else {
 
                     }
-
-                    @Override
-                    public void onAnimationCancel(Animator animation) {
-                        isCanceled = true;
+                    onPageChanged(viewList.get(1).adapterPosition);
+                    if (isAutoScroll) {
+                        rotate();
                     }
 
-                    @Override
-                    public void onAnimationRepeat(Animator animation) {
+                }
 
-                    }
-                });
-                autoScrollAnim.start();
-            }
-        }, mDelay);
+                @Override
+                public void onAnimationCancel(Animator animation) {
+                    isCanceled = true;
+                }
+
+                @Override
+                public void onAnimationRepeat(Animator animation) {
+
+                }
+            });
+            autoScrollAnim.start();
+        }
+    };
+
+    private void rotate() {
+
+        //handler.removeCallbacksAndMessages(null);
+        removeCallbacks(mRunnable);
+        postDelayed(mRunnable,mDelay);
+        //handler.postDelayed(mRunnable, mDelay);
     }
 
     public void start() {
@@ -641,6 +659,10 @@ public class AdverTizeBanner extends ViewGroup {
         }
     }
 
+    @Override
+    protected LayoutParams generateLayoutParams(LayoutParams p) {
+        return new LinearLayout.LayoutParams(p);
+    }
 
     public interface OnPageChangedListener {
         void OnPageChange(int position);
@@ -680,12 +702,13 @@ public class AdverTizeBanner extends ViewGroup {
      */
     private class BannerDataObserver extends AdapterDataObserver {
         public void onChanged() {
-            handler.removeCallbacksAndMessages(null);
+            //handler.removeCallbacksAndMessages(null);
+            removeCallbacks(mRunnable);
             mCurrentScreen = 0;
             mNextScreen = 0;
             viewList.clear();
             scrollTo(0, getScrollY());
-            requestLayout();
+            forceLayout();
             if (isAutoScroll) {
                 isRunning = false;
                 rotate();
@@ -708,7 +731,7 @@ public class AdverTizeBanner extends ViewGroup {
 
         abstract public int getCount();
 
-        abstract public View getView(int position, View mainView);
+        abstract public View getView(int position, View mainView, ViewGroup parent);
 
 
         public void registerAdapterDataObserver(AdapterDataObserver observer) {

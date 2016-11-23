@@ -673,7 +673,6 @@ public class AdverTizeBanner extends ViewGroup {
             onPageChangedListener.OnPageChange(postion);
         }
     }
-
     /**
      * 具体目标
      */
